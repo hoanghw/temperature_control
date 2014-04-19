@@ -15,55 +15,154 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 public class CurrentTemperatureActivity extends Activity {
     Activity mActivity;
     private ProgressDialog dialog;
-    private Button mBtnGetTemperature;
-    private TextView mTxtCurrentTemperature;
+    private TextView mTxtTemperature1C;
+    private TextView mTxtTemperature1F;
+    private TextView mTxtTemperature2C;
+    private TextView mTxtTemperature2F;
+    private TextView mTxtHumidity1;
+    private TextView mTxtHumidity2;
+    Button mBtnRefresh;
+
     /**
      * Called when the activity is first created.
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.current_temperature);
+        setContentView(R.layout.activity_main);
         mActivity = CurrentTemperatureActivity.this;
 
         dialog = new ProgressDialog(mActivity);
         dialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
         dialog.setMessage("Connecting to server...");
 
-        mTxtCurrentTemperature = (TextView) findViewById(R.id.txtCurrentTemperature);
-        mBtnGetTemperature = (Button) findViewById(R.id.btnGetTemperature);
-        mBtnGetTemperature.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                // Perform action on click
-                new fetchData().execute();
+        mTxtTemperature1C = (TextView) findViewById(R.id.temperature_1_c);
+        mTxtTemperature1F = (TextView) findViewById(R.id.temperature_1_f);
+        mTxtTemperature2C = (TextView) findViewById(R.id.temperature_2_c);
+        mTxtTemperature2F = (TextView) findViewById(R.id.temperature_2_f);
+        mTxtHumidity1 = (TextView) findViewById(R.id.humidity_1);
+        mTxtHumidity2 = (TextView) findViewById(R.id.humidity_2);
+
+        mBtnRefresh = (Button) findViewById(R.id.btn_refresh);
+        mBtnRefresh.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                new FetchData(Utils.CHANNEL_TEMPERATURE_1, false, new TaskFinished() {
+                    @Override
+                    public void onTaskFinished(String result) {
+                        if (result == null){
+                            //SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
+                            //result = mSharedPreferences.getString(Utils.CURRENT_TEMPERATURE, null);
+                            mTxtTemperature1C.setText(Utils.NO_RESULT);
+                            mTxtTemperature1F.setText(Utils.NO_RESULT);
+                        }else{
+                            mTxtTemperature1C.setText(Utils.appendC(result));
+                            mTxtTemperature1F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
+                        }
+                    }
+                }).execute();
+
+                new FetchData(Utils.CHANNEL_TEMPERATURE_2, false, new TaskFinished() {
+                    @Override
+                    public void onTaskFinished(String result) {
+                        if (result == null){
+                            mTxtTemperature2C.setText(Utils.NO_RESULT);
+                            mTxtTemperature2F.setText(Utils.NO_RESULT);
+                        }else{
+                            mTxtTemperature2C.setText(Utils.appendC(result));
+                            mTxtTemperature2F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
+                        }
+                    }
+                }).execute();
+
+                new FetchData(Utils.CHANNEL_HUMIDITY_1, false, new TaskFinished() {
+                    @Override
+                    public void onTaskFinished(String result) {
+                        if (result == null){
+                            mTxtHumidity1.setText(Utils.NO_RESULT);
+                        }else{
+                            mTxtHumidity1.setText(Utils.appendP(result));
+                        }
+                    }
+                }).execute();
+
+                new FetchData(Utils.CHANNEL_HUMIDITY_2, false, new TaskFinished() {
+                    @Override
+                    public void onTaskFinished(String result) {
+                        if (result == null){
+                            mTxtHumidity2.setText(Utils.NO_RESULT);
+                        }else{
+                            mTxtHumidity2.setText(Utils.appendP(result));
+                        }
+                    }
+                }).execute();
             }
         });
+
+        mBtnRefresh.callOnClick();
     }
 
-    private class fetchData extends AsyncTask<Void, Void, String>{
+    interface TaskFinished{
+        void onTaskFinished(String result);
+    }
 
-        @Override
-        protected void onPreExecute() {
-            dialog.show();
+    private class FetchData extends AsyncTask<Void, Void, String>{
+        private boolean showLoading = false;
+        private String urlString = null;
+        private String node = null;
+        private TaskFinished callBack;
+
+        public FetchData(int mode, boolean showLoading, TaskFinished callBack){
+            super();
+            this.showLoading = showLoading;
+            this.callBack = callBack;
+
+            switch(mode){
+                case Utils.CHANNEL_HUMIDITY_1:
+                    urlString = Utils.URL_CURRENT_H;
+                    node = Utils.CURRENT_HUMIDITY;
+                    break;
+                case Utils.CHANNEL_HUMIDITY_2:
+                    urlString = Utils.URL_INSIDE_H;
+                    node = Utils.INSIDE_HUMIDITY;
+                    break;
+                case Utils.CHANNEL_TEMPERATURE_1:
+                    urlString = Utils.URL_CURRENT_T;
+                    node = Utils.CURRENT_TEMPERATURE;
+                    break;
+                case Utils.CHANNEL_TEMPERATURE_2:
+                    urlString = Utils.URL_INSIDE_T;
+                    node = Utils.INSIDE_TEMPERATURE;
+                    break;
+                default:
+
+            }
         }
 
         @Override
-        protected String doInBackground(Void... voids) {
+        protected void onPreExecute() {
+            if (showLoading){
+                dialog.show();
+            }
+        }
+
+        @Override
+        protected String doInBackground(Void... parameter) {
+
+            if (urlString == null) return null;
+
             String result;
-            int currentTemperature = 0;
+            double currentTemperature = 0;
             String timestamp = null;   //dow mon dd hh:mm:ss zzz yyyy
             SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
             URLConnection connection;
             try {
-                connection = new URL("http://api.xively.com/v2/feeds/730000241/datastreams/current_tc").openConnection();
-                connection.setRequestProperty("X-ApiKey", "5Eoigt8lr646STNFtBHRvpAD7zGVDVIgkotoEpxiIICCut7K");
+                connection = new URL(urlString).openConnection();
+                connection.setRequestProperty("X-ApiKey", Utils.API_KEY);
                 BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                 StringBuilder completeStream =  new StringBuilder();
                 String inputLine;
@@ -75,24 +174,24 @@ public class CurrentTemperatureActivity extends Activity {
                 //System.out.println(completeStream.toString());
                 JSONObject json = new JSONObject(completeStream.toString());
 
-                currentTemperature = json.getInt("current_value");
+                currentTemperature = json.getDouble("current_value");
                 timestamp = json.getString("at");
-                timestamp = parseTimeStamp(timestamp);
+                timestamp = Utils.parseTimeStamp(timestamp);
 
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
             if (timestamp == null){
-                result = mSharedPreferences.getString(Utils.CURRENT_TEMPERATURE,"NONE");
-                result += " @ ";
-                result += mSharedPreferences.getString(Utils.CURRENT_TIMEPSTAMP,"NONE");
+                result = null;
+                //result = mSharedPreferences.getString(node,null);
+                //timestamp = mSharedPreferences.getString(node + "_at","NONE");
             }else{
                 SharedPreferences.Editor editor = mSharedPreferences.edit();
-                editor.putString(Utils.CURRENT_TEMPERATURE, Integer.toString(currentTemperature));
-                editor.putString(Utils.CURRENT_TIMEPSTAMP, timestamp);
+                editor.putString(node, Double.toString(currentTemperature));
+                editor.putString(node + "_at", timestamp);
                 editor.commit();
-                result = Integer.toString(currentTemperature) + " @ " + timestamp;
+                result = Double.toString(currentTemperature);
             }
 
             return result;
@@ -100,25 +199,10 @@ public class CurrentTemperatureActivity extends Activity {
 
         @Override
         protected void onPostExecute(String result) {
-            dialog.dismiss();
-            mTxtCurrentTemperature.setText(result);
-        }
-
-        private String parseTimeStamp(String timestamp){
-            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-            formatter.setLenient(true);
-
-            timestamp = timestamp.replaceAll("([0-9]*)(.)([0-9]*)(Z)", "$1$4");
-
-            Date date = null;
-
-            try {
-                date = formatter.parse(timestamp);
-            } catch (ParseException e) {
-                e.printStackTrace();
+            if (showLoading){
+                dialog.dismiss();
             }
-
-            return (date == null)? null:date.toString();
+            callBack.onTaskFinished(result);
         }
     }
 
