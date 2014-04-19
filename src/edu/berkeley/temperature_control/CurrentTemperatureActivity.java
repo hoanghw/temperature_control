@@ -25,7 +25,58 @@ public class CurrentTemperatureActivity extends Activity {
     private TextView mTxtTemperature2F;
     private TextView mTxtHumidity1;
     private TextView mTxtHumidity2;
-    Button mBtnRefresh;
+    private Button mBtnRefresh;
+
+    private TaskFinished updateT1 = new TaskFinished() {
+        @Override
+        public void onTaskFinished(String result) {
+            if (result == null){
+                //SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
+                //result = mSharedPreferences.getString(Utils.CURRENT_TEMPERATURE, null);
+                mTxtTemperature1C.setText(Utils.NO_RESULT);
+                mTxtTemperature1F.setText(Utils.NO_RESULT);
+            }else{
+                mTxtTemperature1C.setText(Utils.appendC(result));
+                mTxtTemperature1F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
+            }
+        }
+    };
+
+    private TaskFinished updateT2 = new TaskFinished() {
+        @Override
+        public void onTaskFinished(String result) {
+            if (result == null){
+                mTxtTemperature2C.setText(Utils.NO_RESULT);
+                mTxtTemperature2F.setText(Utils.NO_RESULT);
+            }else{
+                mTxtTemperature2C.setText(Utils.appendC(result));
+                mTxtTemperature2F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
+            }
+        }
+    };
+
+    private TaskFinished updateH1 = new TaskFinished() {
+        @Override
+        public void onTaskFinished(String result) {
+            if (result == null){
+                mTxtHumidity1.setText(Utils.NO_RESULT);
+            }else{
+                mTxtHumidity1.setText(Utils.appendP(result));
+            }
+        }
+    };
+
+    private TaskFinished updateH2 = new TaskFinished() {
+        @Override
+        public void onTaskFinished(String result) {
+            if (result == null){
+                mTxtHumidity2.setText(Utils.NO_RESULT);
+            }else{
+                mTxtHumidity2.setText(Utils.appendP(result));
+            }
+        }
+    };
+
 
     /**
      * Called when the activity is first created.
@@ -51,55 +102,13 @@ public class CurrentTemperatureActivity extends Activity {
         mBtnRefresh.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                new FetchData(Utils.CHANNEL_TEMPERATURE_1, false, new TaskFinished() {
-                    @Override
-                    public void onTaskFinished(String result) {
-                        if (result == null){
-                            //SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
-                            //result = mSharedPreferences.getString(Utils.CURRENT_TEMPERATURE, null);
-                            mTxtTemperature1C.setText(Utils.NO_RESULT);
-                            mTxtTemperature1F.setText(Utils.NO_RESULT);
-                        }else{
-                            mTxtTemperature1C.setText(Utils.appendC(result));
-                            mTxtTemperature1F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
-                        }
-                    }
-                }).execute();
+                new FetchData(Utils.CHANNEL_TEMPERATURE_1, false, updateT1).execute();
 
-                new FetchData(Utils.CHANNEL_TEMPERATURE_2, false, new TaskFinished() {
-                    @Override
-                    public void onTaskFinished(String result) {
-                        if (result == null){
-                            mTxtTemperature2C.setText(Utils.NO_RESULT);
-                            mTxtTemperature2F.setText(Utils.NO_RESULT);
-                        }else{
-                            mTxtTemperature2C.setText(Utils.appendC(result));
-                            mTxtTemperature2F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
-                        }
-                    }
-                }).execute();
+                new FetchData(Utils.CHANNEL_TEMPERATURE_2, false, updateT2).execute();
 
-                new FetchData(Utils.CHANNEL_HUMIDITY_1, false, new TaskFinished() {
-                    @Override
-                    public void onTaskFinished(String result) {
-                        if (result == null){
-                            mTxtHumidity1.setText(Utils.NO_RESULT);
-                        }else{
-                            mTxtHumidity1.setText(Utils.appendP(result));
-                        }
-                    }
-                }).execute();
+                new FetchData(Utils.CHANNEL_HUMIDITY_1, false, updateH1).execute();
 
-                new FetchData(Utils.CHANNEL_HUMIDITY_2, false, new TaskFinished() {
-                    @Override
-                    public void onTaskFinished(String result) {
-                        if (result == null){
-                            mTxtHumidity2.setText(Utils.NO_RESULT);
-                        }else{
-                            mTxtHumidity2.setText(Utils.appendP(result));
-                        }
-                    }
-                }).execute();
+                new FetchData(Utils.CHANNEL_HUMIDITY_2, false, updateH2).execute();
             }
         });
 
