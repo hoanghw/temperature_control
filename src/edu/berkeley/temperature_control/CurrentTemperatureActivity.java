@@ -8,13 +8,19 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 import android.widget.TextView;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class CurrentTemperatureActivity extends Activity {
     Activity mActivity;
@@ -26,6 +32,7 @@ public class CurrentTemperatureActivity extends Activity {
     private TextView mTxtHumidity1;
     private TextView mTxtHumidity2;
     private Button mBtnRefresh;
+    private Switch mHeaterControl;
 
     private TaskFinished updateT1 = new TaskFinished() {
         @Override
@@ -37,7 +44,7 @@ public class CurrentTemperatureActivity extends Activity {
                 mTxtTemperature1F.setText(Utils.NO_RESULT);
             }else{
                 mTxtTemperature1C.setText(Utils.appendC(result));
-                mTxtTemperature1F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
+                mTxtTemperature1F.setText(Utils.appendF(String.valueOf(Utils.cToF(Double.parseDouble(result)))));
             }
         }
     };
@@ -50,7 +57,7 @@ public class CurrentTemperatureActivity extends Activity {
                 mTxtTemperature2F.setText(Utils.NO_RESULT);
             }else{
                 mTxtTemperature2C.setText(Utils.appendC(result));
-                mTxtTemperature2F.setText(Utils.appendF(Double.toString(Utils.cToF(Double.parseDouble(result)))));
+                mTxtTemperature2F.setText(Utils.appendF(String.valueOf(Utils.cToF(Double.parseDouble(result)))));
             }
         }
     };
@@ -77,6 +84,16 @@ public class CurrentTemperatureActivity extends Activity {
         }
     };
 
+    private TaskFinished updateHeater = new TaskFinished() {
+        @Override
+        public void onTaskFinished(String result) {
+            if (result == null || Double.parseDouble(result) == 0){
+                mHeaterControl.setChecked(false);
+            }else{
+                mHeaterControl.setChecked(true);
+            }
+        }
+    };
 
     /**
      * Called when the activity is first created.
@@ -109,6 +126,20 @@ public class CurrentTemperatureActivity extends Activity {
                 new FetchData(Utils.CHANNEL_HUMIDITY_1, false, updateH1).execute();
 
                 new FetchData(Utils.CHANNEL_HUMIDITY_2, false, updateH2).execute();
+
+                new FetchData(Utils.CHANNEL_HEATER, false, updateHeater).execute();
+            }
+        });
+
+        mHeaterControl = (Switch) findViewById(R.id.heater_control);
+        mHeaterControl.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                if (b){
+                    new SwitchHeater().execute(true);
+                }else{
+                    new SwitchHeater().execute(false);
+                }
             }
         });
 
@@ -117,6 +148,33 @@ public class CurrentTemperatureActivity extends Activity {
 
     interface TaskFinished{
         void onTaskFinished(String result);
+    }
+
+    private class SwitchHeater extends AsyncTask<Boolean, Void, Void> {
+        @Override
+        protected Void doInBackground(Boolean... isChecked) {
+            double state = (isChecked[0])? 1:0;
+
+            String timestamp = new SimpleDateFormat(Utils.TIMESTAMP_FORMAT).format(new Date());
+            HttpURLConnection connection;
+            try {
+                connection = (HttpURLConnection) new URL(Utils.URL_SET_HEATER).openConnection();
+                connection.setRequestProperty("X-ApiKey", Utils.API_KEY);
+                connection.setRequestMethod("PUT");
+                connection.setDoOutput(true);
+
+                JSONObject json = Utils.getJson(Utils.HEATER, timestamp, String.valueOf(state));
+
+                OutputStreamWriter out = new OutputStreamWriter(
+                        connection.getOutputStream());
+                out.write(json.toString());
+                out.close();
+                connection.getInputStream();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
     }
 
     private class FetchData extends AsyncTask<Void, Void, String>{
@@ -147,6 +205,9 @@ public class CurrentTemperatureActivity extends Activity {
                     urlString = Utils.URL_INSIDE_T;
                     node = Utils.INSIDE_TEMPERATURE;
                     break;
+                case Utils.CHANNEL_HEATER:
+                    urlString = Utils.URL_GET_HEATER;
+                    node = Utils.HEATER;
                 default:
 
             }
