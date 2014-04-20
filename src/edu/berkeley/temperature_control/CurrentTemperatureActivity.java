@@ -7,10 +7,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.view.View;
-import android.widget.Button;
-import android.widget.CompoundButton;
-import android.widget.Switch;
-import android.widget.TextView;
+import android.widget.*;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -127,7 +124,7 @@ public class CurrentTemperatureActivity extends Activity {
 
                 new FetchData(Utils.CHANNEL_HUMIDITY_2, false, updateH2).execute();
 
-                new FetchData(Utils.CHANNEL_HEATER, false, updateHeater).execute();
+                new FetchData(Utils.CHANNEL_HEATER, true, updateHeater).execute();
             }
         });
 
@@ -170,9 +167,15 @@ public class CurrentTemperatureActivity extends Activity {
                 out.write(json.toString());
                 out.close();
                 connection.getInputStream();
+                return null;
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            mActivity.runOnUiThread(new Runnable() {
+                public void run() {
+                    Toast.makeText(getApplicationContext(), "Please connect to the internet", Toast.LENGTH_SHORT).show();
+                }
+            });
             return null;
         }
     }
@@ -271,6 +274,7 @@ public class CurrentTemperatureActivity extends Activity {
         protected void onPostExecute(String result) {
             if (showLoading){
                 dialog.dismiss();
+                if (result == null) Toast.makeText(getApplicationContext(), "Please connect to the internet", Toast.LENGTH_SHORT).show();
             }
             callBack.onTaskFinished(result);
         }
