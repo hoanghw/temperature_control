@@ -27,19 +27,19 @@ public class CurrentTemperatureActivity extends Activity {
     private TextView mTxtTemperature2C;
     private TextView mTxtTemperature2F;
     private TextView mTxtHumidity1;
-    private TextView mTxtHumidity2;
     private Button mBtnRefresh;
     private Switch mHeaterControl;
+    private Switch mMPC;
 
     private TaskFinished updateT1 = new TaskFinished() {
         @Override
         public void onTaskFinished(String result) {
-            if (result == null){
+            if (result == null) {
                 //SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
                 //result = mSharedPreferences.getString(Utils.CURRENT_TEMPERATURE, null);
                 mTxtTemperature1C.setText(Utils.NO_RESULT);
                 mTxtTemperature1F.setText(Utils.NO_RESULT);
-            }else{
+            } else {
                 mTxtTemperature1C.setText(Utils.appendC(result));
                 mTxtTemperature1F.setText(Utils.appendF(String.valueOf(Utils.cToF(Double.parseDouble(result)))));
             }
@@ -49,10 +49,10 @@ public class CurrentTemperatureActivity extends Activity {
     private TaskFinished updateT2 = new TaskFinished() {
         @Override
         public void onTaskFinished(String result) {
-            if (result == null){
+            if (result == null) {
                 mTxtTemperature2C.setText(Utils.NO_RESULT);
                 mTxtTemperature2F.setText(Utils.NO_RESULT);
-            }else{
+            } else {
                 mTxtTemperature2C.setText(Utils.appendC(result));
                 mTxtTemperature2F.setText(Utils.appendF(String.valueOf(Utils.cToF(Double.parseDouble(result)))));
             }
@@ -62,35 +62,37 @@ public class CurrentTemperatureActivity extends Activity {
     private TaskFinished updateH1 = new TaskFinished() {
         @Override
         public void onTaskFinished(String result) {
-            if (result == null){
+            if (result == null) {
                 mTxtHumidity1.setText(Utils.NO_RESULT);
-            }else{
-                mTxtHumidity1.setText(Utils.appendP(result));
+            } else {
+                mTxtHumidity1.setText(result);
             }
         }
     };
 
-    private TaskFinished updateH2 = new TaskFinished() {
-        @Override
-        public void onTaskFinished(String result) {
-            if (result == null){
-                mTxtHumidity2.setText(Utils.NO_RESULT);
-            }else{
-                mTxtHumidity2.setText(Utils.appendP(result));
-            }
-        }
-    };
 
     private TaskFinished updateHeater = new TaskFinished() {
         @Override
         public void onTaskFinished(String result) {
-            if (result == null || Double.parseDouble(result) == 0){
+            if (result == null || Double.parseDouble(result) == 0) {
                 mHeaterControl.setChecked(false);
-            }else{
+            } else {
                 mHeaterControl.setChecked(true);
             }
         }
     };
+
+    private TaskFinished updateMPC = new TaskFinished() {
+        @Override
+        public void onTaskFinished(String result) {
+            if (result == null || Double.parseDouble(result) == 0) {
+                mMPC.setChecked(false);
+            } else {
+                mMPC.setChecked(true);
+            }
+        }
+    };
+
 
     /**
      * Called when the activity is first created.
@@ -110,7 +112,6 @@ public class CurrentTemperatureActivity extends Activity {
         mTxtTemperature2C = (TextView) findViewById(R.id.temperature_2_c);
         mTxtTemperature2F = (TextView) findViewById(R.id.temperature_2_f);
         mTxtHumidity1 = (TextView) findViewById(R.id.humidity_1);
-        mTxtHumidity2 = (TextView) findViewById(R.id.humidity_2);
 
         mBtnRefresh = (Button) findViewById(R.id.btn_refresh);
         mBtnRefresh.setOnClickListener(new View.OnClickListener() {
@@ -122,7 +123,7 @@ public class CurrentTemperatureActivity extends Activity {
 
                 new FetchData(Utils.CHANNEL_HUMIDITY_1, false, updateH1).execute();
 
-                new FetchData(Utils.CHANNEL_HUMIDITY_2, false, updateH2).execute();
+                new FetchData(Utils.CHANNEL_MPC, false, updateMPC).execute();
 
                 new FetchData(Utils.CHANNEL_HEATER, true, updateHeater).execute();
             }
@@ -132,35 +133,67 @@ public class CurrentTemperatureActivity extends Activity {
         mHeaterControl.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                if (b){
-                    new SwitchHeater().execute(true);
-                }else{
-                    new SwitchHeater().execute(false);
+                if (b) {
+                    new SwitchHeater(Utils.CHANNEL_HEATER).execute(true);
+                } else {
+                    new SwitchHeater(Utils.CHANNEL_HEATER).execute(false);
                 }
             }
         });
 
-        mBtnRefresh.callOnClick();
+        mMPC = (Switch) findViewById(R.id.mpc_control);
+        mMPC.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                if (b) {
+                    new SwitchHeater(Utils.CHANNEL_MPC).execute(true);
+                } else {
+                    new SwitchHeater(Utils.CHANNEL_MPC).execute(false);
+                }
+            }
+        });
+
+
+        mBtnRefresh.performClick();
     }
 
-    interface TaskFinished{
+    interface TaskFinished {
         void onTaskFinished(String result);
     }
 
     private class SwitchHeater extends AsyncTask<Boolean, Void, Void> {
+        private String urlString = null;
+        private String node = null;
+
+        public SwitchHeater(int mode) {
+            super();
+            switch (mode) {
+                case Utils.CHANNEL_HEATER:
+                    urlString = Utils.URL_SET_HEATER;
+                    node = Utils.HEATER;
+                    break;
+                case Utils.CHANNEL_MPC:
+                    urlString = Utils.URL_SET_MPC;
+                    node = Utils.MPC;
+                    break;
+                default:
+            }
+
+        }
+
         @Override
         protected Void doInBackground(Boolean... isChecked) {
-            double state = (isChecked[0])? 1:0;
+            double state = (isChecked[0]) ? 1 : 0;
 
             String timestamp = new SimpleDateFormat(Utils.TIMESTAMP_FORMAT).format(new Date());
             HttpURLConnection connection;
             try {
-                connection = (HttpURLConnection) new URL(Utils.URL_SET_HEATER).openConnection();
+                connection = (HttpURLConnection) new URL(urlString).openConnection();
                 connection.setRequestProperty("X-ApiKey", Utils.API_KEY);
                 connection.setRequestMethod("PUT");
                 connection.setDoOutput(true);
 
-                JSONObject json = Utils.getJson(Utils.HEATER, timestamp, String.valueOf(state));
+                JSONObject json = Utils.getJson(node, timestamp, String.valueOf(state));
 
                 OutputStreamWriter out = new OutputStreamWriter(
                         connection.getOutputStream());
@@ -180,18 +213,18 @@ public class CurrentTemperatureActivity extends Activity {
         }
     }
 
-    private class FetchData extends AsyncTask<Void, Void, String>{
+    private class FetchData extends AsyncTask<Void, Void, String> {
         private boolean showLoading = false;
         private String urlString = null;
         private String node = null;
         private TaskFinished callBack;
 
-        public FetchData(int mode, boolean showLoading, TaskFinished callBack){
+        public FetchData(int mode, boolean showLoading, TaskFinished callBack) {
             super();
             this.showLoading = showLoading;
             this.callBack = callBack;
 
-            switch(mode){
+            switch (mode) {
                 case Utils.CHANNEL_HUMIDITY_1:
                     urlString = Utils.URL_CURRENT_H;
                     node = Utils.CURRENT_HUMIDITY;
@@ -211,6 +244,10 @@ public class CurrentTemperatureActivity extends Activity {
                 case Utils.CHANNEL_HEATER:
                     urlString = Utils.URL_GET_HEATER;
                     node = Utils.HEATER;
+                case Utils.CHANNEL_MPC:
+                    urlString = Utils.URL_GET_MPC;
+                    node = Utils.MPC;
+
                 default:
 
             }
@@ -218,7 +255,7 @@ public class CurrentTemperatureActivity extends Activity {
 
         @Override
         protected void onPreExecute() {
-            if (showLoading){
+            if (showLoading) {
                 dialog.show();
             }
         }
@@ -229,7 +266,7 @@ public class CurrentTemperatureActivity extends Activity {
             if (urlString == null) return null;
 
             String result;
-            double currentTemperature = 0;
+            String currentTemperature = Utils.NO_RESULT;
             String timestamp = null;   //dow mon dd hh:mm:ss zzz yyyy
             SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
             URLConnection connection;
@@ -237,9 +274,9 @@ public class CurrentTemperatureActivity extends Activity {
                 connection = new URL(urlString).openConnection();
                 connection.setRequestProperty("X-ApiKey", Utils.API_KEY);
                 BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                StringBuilder completeStream =  new StringBuilder();
+                StringBuilder completeStream = new StringBuilder();
                 String inputLine;
-                while ((inputLine = in.readLine()) != null){
+                while ((inputLine = in.readLine()) != null) {
                     completeStream.append(inputLine);
                 }
                 in.close();
@@ -247,7 +284,7 @@ public class CurrentTemperatureActivity extends Activity {
                 //System.out.println(completeStream.toString());
                 JSONObject json = new JSONObject(completeStream.toString());
 
-                currentTemperature = json.getDouble("current_value");
+                currentTemperature = json.getString("current_value");
                 timestamp = json.getString("at");
                 timestamp = Utils.parseTimeStamp(timestamp);
 
@@ -255,16 +292,16 @@ public class CurrentTemperatureActivity extends Activity {
                 e.printStackTrace();
             }
 
-            if (timestamp == null){
+            if (timestamp == null) {
                 result = null;
                 //result = mSharedPreferences.getString(node,null);
                 //timestamp = mSharedPreferences.getString(node + "_at","NONE");
-            }else{
+            } else {
                 SharedPreferences.Editor editor = mSharedPreferences.edit();
-                editor.putString(node, Double.toString(currentTemperature));
+                editor.putString(node, currentTemperature);
                 editor.putString(node + "_at", timestamp);
                 editor.commit();
-                result = Double.toString(currentTemperature);
+                result = currentTemperature;
             }
 
             return result;
@@ -272,9 +309,10 @@ public class CurrentTemperatureActivity extends Activity {
 
         @Override
         protected void onPostExecute(String result) {
-            if (showLoading){
+            if (showLoading) {
                 dialog.dismiss();
-                if (result == null) Toast.makeText(getApplicationContext(), "Please connect to the internet", Toast.LENGTH_SHORT).show();
+                if (result == null)
+                    Toast.makeText(getApplicationContext(), "Please connect to the internet", Toast.LENGTH_SHORT).show();
             }
             callBack.onTaskFinished(result);
         }
