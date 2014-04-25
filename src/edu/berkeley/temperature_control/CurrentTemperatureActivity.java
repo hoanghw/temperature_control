@@ -244,10 +244,11 @@ public class CurrentTemperatureActivity extends Activity {
                 case Utils.CHANNEL_HEATER:
                     urlString = Utils.URL_GET_HEATER;
                     node = Utils.HEATER;
+                    break;
                 case Utils.CHANNEL_MPC:
                     urlString = Utils.URL_GET_MPC;
                     node = Utils.MPC;
-
+                    break;
                 default:
 
             }
